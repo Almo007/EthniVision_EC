@@ -13,7 +13,7 @@ pip freeze > requirements.txt
 
 **************************************************************
 # Extensiones
-autoDocstring - Nils Werner
+autoDocstring - Nils Werner  (obligatorio)
 Markdown All in One - Yu Zhang
 
 **************************************************************
@@ -45,39 +45,3 @@ EthniVision-EC/
 ├── .gitignore                  # Reglas de exclusión de Git
 ├── README.md                   # Documentación inicial / Wiki base
 └── requirements.txt            # Lista de dependencias
-
-**************************************************************************************************
-
-EthniVision-EC/
-│
-├── app/                        
-│   ├── .gitkeep
-│   └── main.py                 
-│
-├── data/                       
-│   ├── features/               
-│   │   ├── descriptores_tec1.csv  # Ej: Resultados de HOG
-│   │   ├── descriptores_tec2.csv  # Ej: Resultados de LBP 
-│   │   └── descriptores_tec3.csv  # Ej: Resultados de PCA / Deep Features
-│   ├── processed/              
-│   │   └── .gitkeep
-│   └── raw/                    
-│       └── .gitkeep
-│
-├── models/                     # Aquí irán los 4 modelos finales exportados
-│   ├── .gitkeep
-│   ├── knn_modelo_tec1.pkl     # K-NN entrenado con el dataset 1
-│   ├── knn_modelo_tec2.pkl     # K-NN entrenado con el dataset 2
-│   ├── knn_modelo_tec3.pkl     # K-NN entrenado con el dataset 3
-│   └── cnn_modelo_final.h5     # Modelo de la Red Neuronal Convolucional
-│
-├── src/                        
-│   ├── __init__.py
-│   ├── cnn_model.py            
-│   ├── feature_extraction.py   # Script que generará los 3 archivos en data/features/
-│   ├── knn_model.py            # Script iterativo que generará los 3 .pkl en models/
-│   └── preprocessing.py        
-│
-├── .gitignore                  
-├── README.md                   
-└── requirements.txt
