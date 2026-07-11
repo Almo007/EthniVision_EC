@@ -1,3 +1,4 @@
+USAR PYTHON 3.11.9
 # Paso 1
 py -3.11 -m venv venv
 # Paso 2
@@ -38,7 +39,7 @@ EthniVision-EC/
 ├── src/                        # Código modular que consumirá la app
 │   ├── __init__.py
 │   ├── cnn_model.py            # Arquitectura y entrenamiento de la red
-│   ├── feature_extraction.py   # Algoritmos de extracción (HOG, LBP, etc.)
+│   ├── feature_extraction.py   # Algoritmos de extracción
 │   ├── knn_model.py            # Entrenamiento del K-NN
 │   └── preprocessing.py        # Funciones de limpieza de imagen
 │
