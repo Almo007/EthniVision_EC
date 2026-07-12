@@ -6,9 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from collections import Counter
 
-# Importamos la función que creaste para cargar imágenes con etiquetas
-# from cargar_imagenes import cargar_imagenes_con_etiquetas
-
 """
 Función para analizar un dataset de imágenes organizado en subcarpetas.
 type: carpeta_principal (str): Ruta a la carpeta principal del dataset
