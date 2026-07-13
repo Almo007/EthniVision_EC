@@ -92,8 +92,145 @@ def cargar_y_redimensionar_dataset(carpeta_principal, tamaño_objetivo=(224, 224
     print(f"✓ Cargadas {len(imagenes)} imágenes de {len(clases)} clases")
     
     return np.array(imagenes), etiquetas, clases
+##############################
+def ejemplo(imagen_rgb, nombre_imagen="imagen", carpeta_salida="resultados_histogramas"):
+    """Convierte una imagen RGB al espacio de color LAB, separa el canal L
+    correspondiente a la luminosidad y calcula el histograma original de brillo.
 
+    El canal L representa la luminosidad de la imagen. En OpenCV, sus valores
+    se encuentran en el rango de 0 a 255, donde 0 representa los píxeles más
+    oscuros y 255 representa los píxeles más claros.
 
+    Además, la función exporta el histograma en dos formatos:
+
+    1. Una imagen PNG con la representación gráfica del histograma.
+    2. Un archivo CSV con los niveles de luminosidad y sus frecuencias.
+
+    Args:
+        imagen_rgb : numpy.ndarray
+            Imagen previamente convertida al formato RGB y redimensionada.
+            Se espera una matriz con dimensiones (alto, ancho, 3).
+
+        nombre_imagen : str, opcional
+            Nombre utilizado para identificar los archivos exportados.
+            No debe incluir la extensión del archivo.
+            Por defecto es "imagen".
+
+        carpeta_salida : str, opcional
+            Carpeta donde se almacenarán el histograma y el archivo CSV.
+            Por defecto es "resultados_histogramas".
+
+    Returns:
+        canal_l : numpy.ndarray
+            Canal de luminosidad de la imagen en el espacio LAB.
+
+        histograma_original : numpy.ndarray
+            Histograma del canal L con 256 niveles de intensidad.
+
+        ruta_histograma : str
+            Ruta donde se guardó el gráfico del histograma.
+
+        ruta_csv : str
+            Ruta donde se guardó el archivo CSV.
+
+        None
+            Se devuelve cuando la imagen recibida es inválida.
+    """
+
+    # Verificar que la imagen exista
+    if imagen_rgb is None:
+        print("Error: La imagen recibida es inválida.")
+        return None
+
+    # Verificar que sea un arreglo de NumPy
+    if not isinstance(imagen_rgb, np.ndarray):
+        print("Error: La imagen debe ser un arreglo de NumPy.")
+        return None
+
+    # Verificar que no esté vacía
+    if imagen_rgb.size == 0:
+        print("Error: La imagen está vacía.")
+        return None
+
+    # Verificar que tenga tres canales
+    if imagen_rgb.ndim != 3 or imagen_rgb.shape[2] != 3:
+        print("Error: La imagen debe estar en formato RGB.")
+        return None
+
+    # Crear la carpeta de salida si no existe
+    os.makedirs(carpeta_salida, exist_ok=True)
+
+    # Convertir la imagen de RGB a LAB
+    imagen_lab = cv2.cvtColor(imagen_rgb, cv2.COLOR_RGB2LAB)
+
+    # Extraer únicamente el canal L (Luminosidad)
+    canal_l = imagen_lab[:, :, 0]
+
+    # Calcular el histograma del canal L
+    histograma_original = cv2.calcHist(
+        [canal_l],
+        [0],
+        None,
+        [256],
+        [0, 256]
+    ).flatten()
+
+    # Construcción de rutas de salida
+    ruta_histograma = os.path.join(
+        carpeta_salida,
+        f"{nombre_imagen}_histograma_original.png"
+    )
+
+    ruta_csv = os.path.join(
+        carpeta_salida,
+        f"{nombre_imagen}_histograma_original.csv"
+    )
+
+    # Crear la gráfica del histograma
+    plt.figure(figsize=(10, 5))
+    plt.plot(histograma_original, color="blue")
+    plt.title(f"Histograma Original - Canal L ({nombre_imagen})")
+    plt.xlabel("Nivel de Luminosidad")
+    plt.ylabel("Número de Píxeles")
+    plt.xlim([0, 255])
+    plt.grid(True)
+    plt.tight_layout()
+
+    # Guardar la imagen del histograma
+    plt.savefig(ruta_histograma, dpi=300)
+    plt.close()
+
+    # Exportar el histograma a CSV
+    datos = np.column_stack(
+        (
+            np.arange(256),
+            histograma_original.astype(int)
+        )
+    )
+
+    np.savetxt(
+        ruta_csv,
+        datos,
+        delimiter=",",
+        fmt="%d",
+        header="Nivel_L,Frecuencia",
+        comments=""
+    )
+
+    # Información estadística básica
+    brillo_promedio = np.mean(canal_l)
+    nivel_mas_frecuente = np.argmax(histograma_original)
+    frecuencia_maxima = np.max(histograma_original)
+
+    print(f"\nImagen procesada: {nombre_imagen}")
+    print(f"Brillo promedio: {brillo_promedio:.2f}")
+    print(f"Nivel más frecuente: {nivel_mas_frecuente}")
+    print(f"Frecuencia máxima: {int(frecuencia_maxima)}")
+    print(f"Histograma guardado en: {ruta_histograma}")
+    print(f"CSV guardado en: {ruta_csv}")
+
+    return canal_l, histograma_original, ruta_histograma, ruta_csv
+#############################
 if __name__ == "__main__":
     from pathlib import Path
     
