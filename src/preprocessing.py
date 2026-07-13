@@ -255,3 +255,114 @@ if __name__ == "__main__":
         # Así es como lo usarías en Streamlit cuando te pasen un array de imagen
         # foto_usuario = cv2.imdecode(np.frombuffer(archivo_subido.read(), np.uint8), 1)
         # foto_procesada = procesar_una_imagen(foto_usuario)
+
+def aplicar_clahe_canal_l(imagen_rgb,
+                          clip_limit=2.0,
+                          tile_grid_size=(8, 8)):
+    """Aplica la ecualización adaptativa limitada por contraste (CLAHE)
+    sobre el canal L del espacio de color LAB para mejorar el contraste
+    de la imagen.
+
+    El algoritmo únicamente modifica el canal de luminosidad (L),
+    conservando la información de color de los canales A y B. Después de
+    aplicar CLAHE, se calcula el histograma del nuevo canal L para
+    comparar la distribución de intensidades con respecto al histograma
+    original.
+
+    Args:
+        imagen_rgb : numpy.ndarray
+            Imagen previamente convertida al formato RGB y redimensionada.
+            Se espera una matriz con dimensiones (alto, ancho, 3).
+
+        clip_limit : float, opcional
+            Límite de contraste utilizado por el algoritmo CLAHE.
+            Por defecto es 2.0.
+
+        tile_grid_size : tuple(int, int), opcional
+            Tamaño de la cuadrícula utilizada por CLAHE.
+            Por defecto es (8, 8).
+
+    Returns:
+        imagen_clahe : numpy.ndarray
+            Imagen RGB con el contraste mejorado.
+
+        canal_l_clahe : numpy.ndarray
+            Canal L después de aplicar CLAHE.
+
+        histograma_clahe : numpy.ndarray
+            Histograma del canal L ecualizado con 256 niveles de intensidad.
+
+        None
+            Se devuelve cuando la imagen recibida es inválida.
+    """
+
+    # Verificar que la imagen exista
+    if imagen_rgb is None:
+        print("Error: La imagen recibida es inválida.")
+        return None
+
+    # Verificar que sea un arreglo de NumPy
+    if not isinstance(imagen_rgb, np.ndarray):
+        print("Error: La imagen debe ser un arreglo de NumPy.")
+        return None
+
+    # Verificar que no esté vacía
+    if imagen_rgb.size == 0:
+        print("Error: La imagen está vacía.")
+        return None
+
+    # Verificar que tenga tres canales
+    if imagen_rgb.ndim != 3 or imagen_rgb.shape[2] != 3:
+        print("Error: La imagen debe estar en formato RGB.")
+        return None
+
+    # Convertir de RGB a LAB
+    imagen_lab = cv2.cvtColor(imagen_rgb, cv2.COLOR_RGB2LAB)
+
+    # Extraer los canales L, A y B
+    canal_l, canal_a, canal_b = cv2.split(imagen_lab)
+
+    # Crear el objeto CLAHE
+    clahe = cv2.createCLAHE(
+        clipLimit=clip_limit,
+        tileGridSize=tile_grid_size
+    )
+
+    # Aplicar CLAHE únicamente sobre el canal L
+    canal_l_clahe = clahe.apply(canal_l)
+
+    # Reconstruir la imagen LAB
+    imagen_lab_clahe = cv2.merge(
+        (
+            canal_l_clahe,
+            canal_a,
+            canal_b
+        )
+    )
+
+    # Convertir nuevamente a RGB
+    imagen_clahe = cv2.cvtColor(
+        imagen_lab_clahe,
+        cv2.COLOR_LAB2RGB
+    )
+
+    # Calcular el histograma del canal L ecualizado
+    histograma_clahe = cv2.calcHist(
+        [canal_l_clahe],
+        [0],
+        None,
+        [256],
+        [0, 256]
+    ).flatten()
+
+    # Información estadística básica
+    brillo_promedio = np.mean(canal_l_clahe)
+    nivel_mas_frecuente = np.argmax(histograma_clahe)
+    frecuencia_maxima = np.max(histograma_clahe)
+
+    print("\nCLAHE aplicado correctamente")
+    print(f"Brillo promedio: {brillo_promedio:.2f}")
+    print(f"Nivel más frecuente: {nivel_mas_frecuente}")
+    print(f"Frecuencia máxima: {int(frecuencia_maxima)}")
+
+    return imagen_clahe, canal_l_clahe, histograma_clahe
