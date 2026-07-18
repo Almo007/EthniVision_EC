@@ -1,168 +1,223 @@
-import pandas as pd
-import numpy as np
-from pathlib import Path
 import os
-import json
-import joblib
+import cv2
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-
-from sklearn.model_selection import StratifiedKFold, cross_val_score
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.preprocessing import Normalizer, label_binarize
-from sklearn.metrics import (
-    classification_report, 
-    accuracy_score, 
-    confusion_matrix, 
-    roc_curve, 
-    auc
-)
-from sklearn.pipeline import Pipeline
+from pathlib import Path
+from sklearn.model_selection import train_test_split  # Importación añadida para la partición estratificada
 
 # ==============================================================================
-# 1. CONFIGURACIÓN DE DIRECTORIOS
+# 1. LECTURA, RECORTE CENTRAL Y REDIMENSIONAMIENTO
 # ==============================================================================
-BASE_DIR = Path(__file__).resolve().parent.parent
-FEATURES_DIR = BASE_DIR / "data" / "features"
-MODELOS_DIR = BASE_DIR / "models"
-METRICAS_DIR = BASE_DIR / "metrics"
+def procesar_una_imagen(imagen_bgr, tamaño_objetivo=(224, 224)):
+    """
+    Procesa una imagen realizando la conversión de BGR a RGB, un recorte
+    central cuadrado y el redimensionamiento al tamaño
+    especificado.
 
-os.makedirs(MODELOS_DIR, exist_ok=True)
-os.makedirs(METRICAS_DIR, exist_ok=True)
+    El recorte central permite conservar las proporciones originales de la
+    imagen y evitar distorsiones geométricas durante el redimensionamiento,
+    lo que resulta especialmente útil en tareas de reconocimiento facial.
 
-MODELOS = ["siglip", "clip", "dinov2"]
-CLASES = ['Afro-ecuadorians', 'European descendants', 'Indigenous', 'Mestizos']
+    Args:
+        imagen_bgr (numpy.ndarray): Imagen de entrada en formato BGR,
+            leída mediante OpenCV.
+        tamaño_objetivo (tuple[int, int], optional): Dimensiones finales
+            (ancho, alto) de la imagen procesada. Por defecto es
+            (224, 224).
 
-# ==============================================================================
-# 2. CARGA DE DATOS
-# ==============================================================================
-def cargar_datos(modelo_nombre: str):
-    ruta_train = FEATURES_DIR / f"{modelo_nombre}_train.csv"
-    ruta_test = FEATURES_DIR / f"{modelo_nombre}_test.csv"
-    
-    if not ruta_train.exists() or not ruta_test.exists(): 
-        return None, None, None, None
+    Returns:
+        numpy.ndarray | None: Imagen procesada en formato RGB con el tamaño
+        especificado. Devuelve ``None`` si la imagen de entrada es nula.
+    """
+    if imagen_bgr is None:
+        return None
         
-    df_train = pd.read_csv(ruta_train)
-    df_test = pd.read_csv(ruta_test)
+    # 1. Convertir de BGR a RGB
+    img_rgb = cv2.cvtColor(imagen_bgr, cv2.COLOR_BGR2RGB)
     
-    X_train = df_train.drop(columns=['filename', 'class']).to_numpy(dtype=np.float32)
-    y_train = df_train['class'].to_numpy(dtype=str)
-    X_test = df_test.drop(columns=['filename', 'class']).to_numpy(dtype=np.float32)
-    y_test = df_test['class'].to_numpy(dtype=str)
+    # 2. Obtener dimensiones originales
+    alto_original, ancho_original = img_rgb.shape[:2]
     
-    return X_train, y_train, X_test, y_test
+    # 3. Calcular el tamaño del cuadrado perfecto (tomando el lado más corto)
+    lado_cuadrado = min(alto_original, ancho_original)
+    
+    # 4. Calcular las coordenadas para el recorte central
+    inicio_y = (alto_original // 2) - (lado_cuadrado // 2)
+    inicio_x = (ancho_original // 2) - (lado_cuadrado // 2)
+    
+    # 5. Aplicar el recorte (Center Crop)
+    img_cuadrada = img_rgb[inicio_y : inicio_y + lado_cuadrado, 
+                           inicio_x : inicio_x + lado_cuadrado]
+    
+    # 6. Redimensionamiento final unificado (Ahora sin distorsión geométrica)
+    img_redimensionada = cv2.resize(img_cuadrada, tamaño_objetivo)
+    
+    return img_redimensionada
 
 # ==============================================================================
-# 3. GENERACIÓN DE GRÁFICAS (MATRIZ Y ROC)
+# 2. ESPACIO LAB E HISTOGRAMA ORIGINAL
 # ==============================================================================
-def graficar_matriz_confusion(y_true, y_pred, modelo_nombre):
-    cm = confusion_matrix(y_true, y_pred, labels=CLASES)
-    plt.figure(figsize=(8,6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=CLASES, yticklabels=CLASES)
-    plt.title(f'Matriz de Confusión - {modelo_nombre.upper()} + KNN')
-    plt.ylabel('Etiqueta Verdadera')
-    plt.xlabel('Predicción')
-    plt.tight_layout()
-    plt.savefig(METRICAS_DIR / f"cm_{modelo_nombre}.png", dpi=300)
-    plt.close()
-    return cm.tolist() # Retornamos como lista para poder guardarlo en JSON
+def calcular_histograma_original(imagen_rgb):
+    """
+    Convierte una imagen RGB al espacio de color LAB y calcula el histograma
+    del canal de luminosidad (L).
 
-def graficar_curva_roc(y_test, y_prob, modelo_nombre):
-    # Binarizar las etiquetas para estrategia One-vs-Rest (OvR)
-    y_test_bin = label_binarize(y_test, classes=CLASES)
-    n_classes = len(CLASES)
-    
-    plt.figure(figsize=(10, 8))
-    colores = ['blue', 'green', 'red', 'purple']
-    
-    auc_dict = {}
-    for i in range(n_classes):
-        fpr, tpr, _ = roc_curve(y_test_bin[:, i], y_prob[:, i])
-        roc_auc = auc(fpr, tpr)
-        auc_dict[CLASES[i]] = roc_auc
-        plt.plot(fpr, tpr, color=colores[i], lw=2, 
-                 label=f'ROC {CLASES[i]} (AUC = {roc_auc:.2f})')
+    Args:
+        imagen_rgb (numpy.ndarray): Imagen de entrada en formato RGB.
 
-    plt.plot([0, 1], [0, 1], 'k--', lw=2)
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('Tasa de Falsos Positivos')
-    plt.ylabel('Tasa de Verdaderos Positivos')
-    plt.title(f'Curva ROC Multiclase (OvR) - {modelo_nombre.upper()}')
-    plt.legend(loc="lower right")
-    plt.tight_layout()
-    plt.savefig(METRICAS_DIR / f"roc_{modelo_nombre}.png", dpi=300)
-    plt.close()
-    
-    return auc_dict
+    Returns:
+        tuple[numpy.ndarray, numpy.ndarray]:
+            - Canal L de la imagen.
+            - Histograma de 256 posiciones correspondiente al canal L.
+    """
+    imagen_lab = cv2.cvtColor(imagen_rgb, cv2.COLOR_RGB2LAB)
+    canal_l = imagen_lab[:, :, 0]
+    histograma = cv2.calcHist([canal_l], [0], None, [256], [0, 256]).flatten()
+    return canal_l, histograma
 
 # ==============================================================================
-# 4. EVALUACIÓN Y EXPORTACIÓN
+# 3. CLAHE, FUSIÓN DE CANALES Y RETORNO A RGB
 # ==============================================================================
-def evaluar_modelo(modelo_nombre: str, k_neighbors: int = 5):
-    print(f"\n{'='*60}\n EVALUANDO: {modelo_nombre.upper()} + K-NN\n{'='*60}")
+def aplicar_clahe_canal_l(imagen_rgb, clip_limit=2.0, tile_grid_size=(8, 8)):
+    """
+    Aplica el algoritmo CLAHE sobre el canal de luminosidad (L) del espacio
+    de color LAB para mejorar el contraste de la imagen.
+
+    Args:
+        imagen_rgb (numpy.ndarray): Imagen de entrada en formato RGB.
+        clip_limit (float, optional): Límite de contraste utilizado por CLAHE.
+            Por defecto es 2.0.
+        tile_grid_size (tuple[int, int], optional): Tamaño de la cuadrícula
+            utilizada por CLAHE. Por defecto es (8, 8).
+
+    Returns:
+        tuple[numpy.ndarray, numpy.ndarray]:
+            - Imagen procesada en formato RGB.
+            - Histograma del canal L después de aplicar CLAHE.
+    """
+    imagen_lab = cv2.cvtColor(imagen_rgb, cv2.COLOR_RGB2LAB)
+    canal_l, canal_a, canal_b = cv2.split(imagen_lab)
     
-    X_train, y_train, X_test, y_test = cargar_datos(modelo_nombre)
-    if X_train is None: 
-        print(f"❌ No se encontraron datos para {modelo_nombre}.")
-        return None, None
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    canal_l_clahe = clahe.apply(canal_l)
+    
+    histograma_ecualizado = cv2.calcHist([canal_l_clahe], [0], None, [256], [0, 256]).flatten()
+    imagen_lab_clahe = cv2.merge((canal_l_clahe, canal_a, canal_b))
+    imagen_clahe_rgb = cv2.cvtColor(imagen_lab_clahe, cv2.COLOR_LAB2RGB)
+    
+    return imagen_clahe_rgb, histograma_ecualizado
+
+# ==============================================================================
+# FUNCIONES AUXILIARES Y ORQUESTADOR PRINCIPAL DEL PIPELINE
+# ==============================================================================
+def procesar_y_guardar_conjunto(rutas_imagenes, etiquetas, ruta_salida_base, subcarpeta, tamaño_objetivo):
+    """
+    Itera sobre una lista de rutas de imágenes, aplica las fases de limpieza 
+    (Center Crop y CLAHE) y guarda los resultados en la estructura de 
+    directorios correspondiente (train o test).
+
+    Args:
+        rutas_imagenes (list[str]): Lista de rutas absolutas de las imágenes a procesar.
+        etiquetas (list[str]): Lista de etiquetas (clases) correspondientes a cada imagen.
+        ruta_salida_base (str): Ruta base principal donde se guardará el dataset procesado.
+        subcarpeta (str): Nombre del directorio de destino ('train' o 'test').
+        tamaño_objetivo (tuple[int, int]): Dimensiones finales (ancho, alto) de las imágenes.
+
+    Returns:
+        int: Número total de imágenes procesadas y guardadas exitosamente.
+    """
+    total_procesadas = 0
+    for ruta_img, clase in zip(rutas_imagenes, etiquetas):
+        # Crear estructura de carpetas: data/processed/train/clase/
+        ruta_salida_clase = os.path.join(ruta_salida_base, subcarpeta, clase)
+        os.makedirs(ruta_salida_clase, exist_ok=True)
+
+        img_cruda = cv2.imread(ruta_img)
         
-    # El K-Means secuencial online nos dio bases sólidas para entender estas agrupaciones geométricas
-    pipeline = Pipeline([
-        ('scaler', Normalizer(norm='l2')), 
-        ('knn', KNeighborsClassifier(n_neighbors=k_neighbors, weights='distance', metric='cosine'))
-    ])
+        # Paso 1: Recorte Central y Resize
+        img_rgb_224 = procesar_una_imagen(img_cruda, tamaño_objetivo)
+
+        if img_rgb_224 is not None:
+            # Paso 2 y 3: Mejorar iluminación con CLAHE
+            img_final_rgb, _ = aplicar_clahe_canal_l(img_rgb_224)
+            
+            # Paso 4: Exportar a disco (Convertir a BGR para OpenCV)
+            img_bgr_export = cv2.cvtColor(img_final_rgb, cv2.COLOR_RGB2BGR)
+            
+            # Mantener el nombre original del archivo para asegurar trazabilidad
+            nombre_archivo = os.path.basename(ruta_img)
+            cv2.imwrite(os.path.join(ruta_salida_clase, nombre_archivo), img_bgr_export)
+            total_procesadas += 1
+
+    return total_procesadas
+
+def ejecutar_pipeline_completo(ruta_cruda, ruta_procesada, tamaño_objetivo=(224, 224), test_size=0.2):
+    """
+    Ejecuta el pipeline completo recolectando el dataset crudo, realizando una 
+    partición estratificada en conjuntos de entrenamiento (Train) y prueba (Test), 
+    y preprocesando ambos subconjuntos independientemente.
+
+    Args:
+        ruta_cruda (str): Ruta del directorio que contiene el dataset
+            original organizado por clases.
+        ruta_procesada (str): Ruta principal donde se crearán las subcarpetas 
+            'train' y 'test' con el dataset preprocesado.
+        tamaño_objetivo (tuple[int, int], optional): Dimensiones finales
+            (ancho, alto) utilizadas para redimensionar cada imagen.
+            Por defecto es (224, 224).
+        test_size (float, optional): Proporción del dataset a reservar para
+            la evaluación final (Prueba). Por defecto es 0.2 (20%).
+
+    Returns:
+        None
+    """
+    clases = sorted([d for d in os.listdir(ruta_cruda) if os.path.isdir(os.path.join(ruta_cruda, d))])
     
-    # 1. Ajustar el modelo final
-    pipeline.fit(X_train, y_train)
+    rutas_imagenes_todas = []
+    etiquetas_todas = []
     
-    # 2. Predicciones y Probabilidades
-    y_pred = pipeline.predict(X_test)
-    y_prob = pipeline.predict_proba(X_test) # Necesario para la curva ROC
+    # Recopilar todas las imágenes disponibles
+    for clase in clases:
+        ruta_clase = os.path.join(ruta_cruda, clase)
+        archivos = [f for f in os.listdir(ruta_clase) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        for archivo in archivos:
+            rutas_imagenes_todas.append(os.path.join(ruta_clase, archivo))
+            etiquetas_todas.append(clase)
+
+    if not rutas_imagenes_todas:
+        print(f"Error: No se encontraron imágenes en {ruta_cruda}")
+        return
+
+    print("Realizando partición estratificada del dataset (Train/Test Split)...")
+    # División manteniendo el balance (o desbalance) original de las clases
+    X_train, X_test, y_train, y_test = train_test_split(
+        rutas_imagenes_todas, 
+        etiquetas_todas, 
+        test_size=test_size, 
+        stratify=etiquetas_todas, 
+        random_state=42 # Semilla para garantizar reproducibilidad
+    )
     
-    test_accuracy = accuracy_score(y_test, y_pred)
-    
-    # 3. Extraer métricas detalladas en formato diccionario
-    reporte_dict = classification_report(y_test, y_pred, target_names=CLASES, output_dict=True)
-    
-    print(f"🏆 TEST ACCURACY: {test_accuracy:.3f}")
-    print("-" * 60)
-    print(classification_report(y_test, y_pred, target_names=CLASES))
-    
-    # 4. Generar Gráficas y extraer datos crudos
-    cm_lista = graficar_matriz_confusion(y_test, y_pred, modelo_nombre)
-    auc_dict = graficar_curva_roc(y_test, y_prob, modelo_nombre)
-    
-    # 5. Estructurar la metadata a quemar en el JSON
-    metricas_modelo = {
-        "accuracy_global": test_accuracy,
-        "reporte_clasificacion": reporte_dict,
-        "matriz_confusion": cm_lista,
-        "roc_auc_por_clase": auc_dict
-    }
-    
-    return pipeline, metricas_modelo
+    print(f"Total a procesar -> Train: {len(X_train)} imágenes | Test: {len(X_test)} imágenes\n")
+
+    # Ejecutar procesamiento para entrenamiento
+    print("Iniciando procesamiento del conjunto de ENTRENAMIENTO (Train)...")
+    total_train = procesar_y_guardar_conjunto(X_train, y_train, ruta_procesada, 'train', tamaño_objetivo)
+
+    # Ejecutar procesamiento para pruebas
+    print("Iniciando procesamiento del conjunto de PRUEBAS (Test)...")
+    total_test = procesar_y_guardar_conjunto(X_test, y_test, ruta_procesada, 'test', tamaño_objetivo)
+
+    print(f"\n✅ Pipeline finalizado con éxito.")
+    print(f"Exportación completa -> Train procesadas: {total_train} | Test procesadas: {total_test}")
+    print(f"Dataset estructurado exportado a: {ruta_procesada}")
 
 if __name__ == "__main__":
-    print("Iniciando Evaluación, Generación de Gráficas y Exportación...")
-    master_metrics = {}
+    base_dir = Path(__file__).resolve().parent.parent
+    carpeta_dataset_crudo = base_dir / "data" / "raw"
+    carpeta_dataset_procesado = base_dir / "data" / "processed"
     
-    for modelo in MODELOS:
-        pipeline, metricas = evaluar_modelo(modelo, k_neighbors=5) 
-        if pipeline is not None:
-            # Quemar métricas en memoria principal
-            master_metrics[modelo] = metricas
-            
-            # Guardar el modelo físico (.pkl)
-            ruta_guardado = MODELOS_DIR / f"knn_{modelo}_best.pkl"
-            joblib.dump(pipeline, ruta_guardado)
-            print(f"Pipeline de {modelo.upper()} exportado a: {ruta_guardado.name}")
-            
-    # Guardar el JSON maestro con todas las métricas de todos los modelos
-    ruta_json = METRICAS_DIR / "master_metrics.json"
-    with open(ruta_json, "w", encoding="utf-8") as f:
-        json.dump(master_metrics, f, indent=4)
-        
-    print(f"\n¡Todas las métricas y reportes han sido quemados en: {ruta_json.name}!")
-    print("Revisa la carpeta 'metrics/' para ver las curvas ROC y Matrices de Confusión generadas.")
+    if not carpeta_dataset_crudo.exists():
+        print(f"Error: No se encontró la carpeta cruda en {carpeta_dataset_crudo}")
+    else:
+        ejecutar_pipeline_completo(str(carpeta_dataset_crudo), str(carpeta_dataset_procesado))
