@@ -1,0 +1,26 @@
+{
+    "total_imagenes": 430,
+    "distribucion_clases": {
+        "Mestizos": 280,
+        "Afro-ecuadorians": 50,
+        "European descendants": 50,
+        "Indigenous": 50
+    },
+    "orientaciones": {
+        "Horizontal": 430
+    },
+    "formatos": {
+        ".JPG": 430
+    },
+    "promedios": {
+        "brillo": 188.84,
+        "desenfoque_laplaciano": 5.34,
+        "peso_mb": 0.8
+    },
+    "imagenes_muestra": {
+        "Afro-ecuadorians": "data/raw/Afro-ecuadorians/003_4.JPG",
+        "European descendants": "data/raw/European descendants/002_38.JPG",
+        "Indigenous": "data/raw/Indigenous/001_45.JPG",
+        "Mestizos": "data/raw/Mestizos/004_200.JPG"
+    }
+}

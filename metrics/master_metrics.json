@@ -1,0 +1,224 @@
+{
+    "siglip": {
+        "accuracy_global": 0.8023255813953488,
+        "reporte_clasificacion": {
+            "Afro-ecuadorians": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 10.0
+            },
+            "European descendants": {
+                "precision": 1.0,
+                "recall": 0.1,
+                "f1-score": 0.18181818181818182,
+                "support": 10.0
+            },
+            "Indigenous": {
+                "precision": 1.0,
+                "recall": 0.2,
+                "f1-score": 0.3333333333333333,
+                "support": 10.0
+            },
+            "Mestizos": {
+                "precision": 0.7671232876712328,
+                "recall": 1.0,
+                "f1-score": 0.8682170542635659,
+                "support": 56.0
+            },
+            "accuracy": 0.8023255813953488,
+            "macro avg": {
+                "precision": 0.9417808219178082,
+                "recall": 0.575,
+                "f1-score": 0.5958421423537703,
+                "support": 86.0
+            },
+            "weighted avg": {
+                "precision": 0.8483593501115005,
+                "recall": 0.8023255813953488,
+                "f1-score": 0.7415310487241261,
+                "support": 86.0
+            }
+        },
+        "matriz_confusion": [
+            [
+                10,
+                0,
+                0,
+                0
+            ],
+            [
+                0,
+                1,
+                0,
+                9
+            ],
+            [
+                0,
+                0,
+                2,
+                8
+            ],
+            [
+                0,
+                0,
+                0,
+                56
+            ]
+        ],
+        "roc_auc_por_clase": {
+            "Afro-ecuadorians": 1.0,
+            "European descendants": 0.5605263157894737,
+            "Indigenous": 0.7302631578947368,
+            "Mestizos": 0.7285714285714286
+        }
+    },
+    "clip": {
+        "accuracy_global": 0.7558139534883721,
+        "reporte_clasificacion": {
+            "Afro-ecuadorians": {
+                "precision": 1.0,
+                "recall": 1.0,
+                "f1-score": 1.0,
+                "support": 10.0
+            },
+            "European descendants": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1-score": 0.0,
+                "support": 10.0
+            },
+            "Indigenous": {
+                "precision": 0.5,
+                "recall": 0.1,
+                "f1-score": 0.16666666666666666,
+                "support": 10.0
+            },
+            "Mestizos": {
+                "precision": 0.7397260273972602,
+                "recall": 0.9642857142857143,
+                "f1-score": 0.8372093023255814,
+                "support": 56.0
+            },
+            "accuracy": 0.7558139534883721,
+            "macro avg": {
+                "precision": 0.559931506849315,
+                "recall": 0.5160714285714286,
+                "f1-score": 0.500968992248062,
+                "support": 86.0
+            },
+            "weighted avg": {
+                "precision": 0.6561006690028671,
+                "recall": 0.7558139534883721,
+                "f1-score": 0.6808184604290608,
+                "support": 86.0
+            }
+        },
+        "matriz_confusion": [
+            [
+                10,
+                0,
+                0,
+                0
+            ],
+            [
+                0,
+                0,
+                0,
+                10
+            ],
+            [
+                0,
+                0,
+                1,
+                9
+            ],
+            [
+                0,
+                1,
+                1,
+                54
+            ]
+        ],
+        "roc_auc_por_clase": {
+            "Afro-ecuadorians": 1.0,
+            "European descendants": 0.5447368421052632,
+            "Indigenous": 0.5605263157894737,
+            "Mestizos": 0.6663690476190476
+        }
+    },
+    "dinov2": {
+        "accuracy_global": 0.6511627906976745,
+        "reporte_clasificacion": {
+            "Afro-ecuadorians": {
+                "precision": 0.8888888888888888,
+                "recall": 0.8,
+                "f1-score": 0.8421052631578947,
+                "support": 10.0
+            },
+            "European descendants": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1-score": 0.0,
+                "support": 10.0
+            },
+            "Indigenous": {
+                "precision": 0.25,
+                "recall": 0.2,
+                "f1-score": 0.2222222222222222,
+                "support": 10.0
+            },
+            "Mestizos": {
+                "precision": 0.7076923076923077,
+                "recall": 0.8214285714285714,
+                "f1-score": 0.7603305785123967,
+                "support": 56.0
+            },
+            "accuracy": 0.6511627906976745,
+            "macro avg": {
+                "precision": 0.46164529914529917,
+                "recall": 0.45535714285714285,
+                "f1-score": 0.45616451597312846,
+                "support": 86.0
+            },
+            "weighted avg": {
+                "precision": 0.5932518386006758,
+                "recall": 0.6511627906976745,
+                "f1-score": 0.61885799128483,
+                "support": 86.0
+            }
+        },
+        "matriz_confusion": [
+            [
+                8,
+                0,
+                1,
+                1
+            ],
+            [
+                0,
+                0,
+                0,
+                10
+            ],
+            [
+                0,
+                0,
+                2,
+                8
+            ],
+            [
+                1,
+                4,
+                5,
+                46
+            ]
+        ],
+        "roc_auc_por_clase": {
+            "Afro-ecuadorians": 0.9947368421052631,
+            "European descendants": 0.5249999999999999,
+            "Indigenous": 0.6453947368421051,
+            "Mestizos": 0.630654761904762
+        }
+    }
+}
