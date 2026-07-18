@@ -3,15 +3,26 @@ venv/
 env/
 .venv/
 
-# Carpetas de datos y modelos pesados
+# Carpetas de datos (raw, processed, features) ignoradas por seguridad/peso
 data/raw/*
 !data/raw/.gitkeep
 data/processed/*
 !data/processed/.gitkeep
 data/features/*
 !data/features/.gitkeep
+
+# Modelos: ignorar todo, pero permitir .pkl y .pth
 models/*
 !models/.gitkeep
+!models/*.pkl
+!models/*.pth
+
+# Métricas: ignorar todo, pero permitir tus archivos de datos/métricas
+metrics/*
+!metrics/.gitkeep
+!metrics/*.json
+!metrics/*.csv
+!metrics/*.txt
 
 # Archivos temporales de Python
 __pycache__/
