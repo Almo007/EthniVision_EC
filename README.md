@@ -6,6 +6,12 @@ La aplicación incorpora un **Dashboard interactivo desarrollado con Streamlit**
 
 ---
 
+# Accede a la aplicación web desde el siguiente enlace:
+```bash
+https://ethnivisionec.streamlit.app/
+```
+---
+
 # Características principales
 
 - Análisis exploratorio del dataset (EDA).
