@@ -10,6 +10,7 @@ data/processed/*
 !data/processed/.gitkeep
 data/features/*
 !data/features/.gitkeep
+!data/features/eda_metadata.csv
 
 # Modelos: ignorar todo, pero permitir .pkl y .pth
 models/*
