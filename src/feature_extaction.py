@@ -42,6 +42,29 @@ standard_transforms = transforms.Compose([
 # 2. CARGA DE MODELOS
 # ==============================================================================
 def cargar_modelos():
+    """
+    Carga los modelos fundacionales de visión utilizados para la extracción
+    de características.
+
+    Inicializa los modelos CLIP, DINOv2 y SigLIP junto con sus respectivos
+    procesadores, los transfiere al dispositivo de ejecución disponible
+    (CPU, CUDA o MPS) y los configura en modo de evaluación.
+
+    Returns:
+        tuple:
+            Tupla que contiene los siguientes elementos en orden:
+
+            - CLIPVisionModel: Modelo de visión CLIP.
+            - CLIPProcessor: Procesador asociado a CLIP.
+            - torch.nn.Module: Modelo DINOv2.
+            - SiglipVisionModel: Modelo de visión SigLIP.
+            - AutoProcessor: Procesador asociado a SigLIP.
+
+    Notes:
+        Todos los modelos son cargados desde Hugging Face o Torch Hub
+        utilizando pesos preentrenados y se emplean únicamente para
+        inferencia (feature extraction).
+    """
     print("\n📦 Cargando Transformers Fundacionales...")
     
     # CLIP
@@ -61,6 +84,42 @@ def cargar_modelos():
 # 3. MOTOR DE EXTRACCIÓN
 # ==============================================================================
 def extraer_caracteristicas_subconjunto(modelos, subconjunto):
+    """
+    Extrae embeddings de imágenes utilizando múltiples modelos
+    fundacionales y almacena los vectores de características en
+    archivos CSV.
+
+    Para cada imagen del subconjunto indicado, la función genera
+    representaciones mediante CLIP, DINOv2 y SigLIP. Los embeddings
+    obtenidos se combinan con el nombre del archivo y su clase para
+    generar un conjunto de datos estructurado.
+
+    Args:
+        modelos (tuple):
+            Tupla que contiene los modelos y procesadores previamente
+            cargados mediante la función ``cargar_modelos()``.
+
+        subconjunto (str):
+            Nombre del subconjunto a procesar, normalmente
+            ``"train"`` o ``"test"``.
+
+    Returns:
+        None
+
+    Notes:
+        Durante el proceso se generan tres archivos CSV,
+        uno por cada modelo fundacional:
+
+        - clip_<subconjunto>.csv
+        - dinov2_<subconjunto>.csv
+        - siglip_<subconjunto>.csv
+
+        Cada archivo contiene:
+
+        - Nombre de la imagen.
+        - Clase de la imagen.
+        - Vector de características (embeddings).
+    """
     clip_model, clip_processor, dinov2, siglip_model, siglip_processor = modelos
     ruta_base = PROCESSED_DIR / subconjunto
     if not ruta_base.exists(): return
@@ -108,6 +167,29 @@ def extraer_caracteristicas_subconjunto(modelos, subconjunto):
     df_base = pd.DataFrame({'filename': [os.path.basename(r) for r in rutas_a_procesar], 'class': etiquetas_a_procesar})
     
     def guardar_csv(embeddings, nombre_modelo, sub):
+        """
+        Genera un archivo CSV con los embeddings extraídos por un modelo
+        fundacional.
+
+        La función crea nombres de columnas para cada característica,
+        concatena los metadatos de la imagen con los vectores de
+        características y exporta el resultado a un archivo CSV.
+
+        Args:
+            embeddings (numpy.ndarray):
+                Matriz de embeddings donde cada fila corresponde a una imagen
+                y cada columna representa una característica.
+
+            nombre_modelo (str):
+                Nombre del modelo que generó los embeddings.
+
+            sub (str):
+                Nombre del subconjunto procesado, por ejemplo
+                ``"train"`` o ``"test"``.
+
+        Returns:
+            None
+        """
         # Generar nombres de columna únicos para evitar errores de alineación
         cols = [f"feat_{i}" for i in range(embeddings.shape[1])]
         df_feats = pd.DataFrame(embeddings, columns=cols)

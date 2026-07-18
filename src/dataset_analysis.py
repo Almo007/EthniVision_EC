@@ -7,9 +7,52 @@ import random
 import json
 
 def analyze_dataset(data_dir, output_dir, metrics_dir):
-    """Analiza un conjunto de imágenes organizado por carpetas,
-    extrae metadatos relevantes de cada imagen, genera un archivo CSV y 
-    'quema' las estadísticas globales en un archivo JSON para el Dashboard.
+    """
+    Analiza un conjunto de imágenes organizadas por carpetas de clases,
+    extrae metadatos de cada imagen y genera archivos con información
+    estadística para su posterior análisis.
+
+    El proceso recorre todas las clases del dataset, calcula métricas
+    individuales para cada imagen, genera un archivo CSV con los
+    metadatos y crea un archivo JSON con estadísticas globales que
+    pueden ser utilizadas por un Dashboard.
+
+    Args:
+        data_dir (str | pathlib.Path):
+            Ruta del directorio que contiene las imágenes organizadas
+            por carpetas, donde cada carpeta representa una clase.
+
+        output_dir (str | pathlib.Path):
+            Directorio donde se almacenará el archivo CSV con los
+            metadatos extraídos del conjunto de imágenes.
+
+        metrics_dir (str | pathlib.Path):
+            Directorio donde se almacenará el archivo JSON con las
+            métricas globales del dataset.
+
+    Returns:
+        None
+
+    Notes:
+        Durante la ejecución se calculan las siguientes métricas para
+        cada imagen:
+
+        - Resolución.
+        - Formato del archivo.
+        - Tamaño en megabytes.
+        - Tipo de color (RGB o escala de grises).
+        - Nivel de desenfoque mediante el operador Laplaciano.
+        - Nivel de brillo promedio.
+        - Orientación (Horizontal, Vertical o Cuadrada).
+
+        Además, se generan estadísticas globales como:
+
+        - Total de imágenes.
+        - Distribución por clases.
+        - Distribución por formatos.
+        - Distribución por orientaciones.
+        - Promedios de brillo, desenfoque y tamaño.
+        - Una imagen representativa por cada clase.
     """
     data_path = Path(data_dir).resolve()
     out_path = Path(output_dir).resolve()

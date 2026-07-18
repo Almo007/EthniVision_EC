@@ -61,6 +61,33 @@ test_transforms = transforms.Compose([
 # 3. FUNCIONES DE GRÁFICADO
 # ==============================================================================
 def graficar_curva_roc_cnn(y_test, y_prob, clases, best_epoch):
+    """
+    Genera y almacena la curva ROC multiclase mediante la estrategia
+    One-vs-Rest (OvR) para el modelo CNN entrenado.
+
+    La función binariza las etiquetas reales, calcula la curva ROC y el
+    área bajo la curva (AUC) para cada clase, genera la representación
+    gráfica y la almacena dentro del directorio de métricas del proyecto.
+
+    Args:
+        y_test (array-like):
+            Etiquetas reales del conjunto de prueba codificadas como índices.
+
+        y_prob (numpy.ndarray):
+            Matriz de probabilidades predichas por la red neuronal.
+            Cada fila corresponde a una imagen y cada columna a una clase.
+
+        clases (list[str]):
+            Lista con los nombres de las clases del problema.
+
+        best_epoch (int):
+            Época del entrenamiento en la que se obtuvo el mejor modelo.
+
+    Returns:
+        dict:
+            Diccionario cuya clave corresponde al nombre de cada clase y
+            cuyo valor representa el área bajo la curva ROC (AUC).
+    """
     # Binarizamos usando los índices de las clases (0, 1, 2, 3)
     indices_clases = list(range(len(clases)))
     y_test_bin = label_binarize(y_test, classes=indices_clases)
@@ -94,6 +121,37 @@ def graficar_curva_roc_cnn(y_test, y_prob, clases, best_epoch):
 # 4. ENTRENAMIENTO DE LA CNN (End-to-End)
 # ==============================================================================
 def entrenar_cnn():
+    """
+    Ejecuta el pipeline completo de entrenamiento, evaluación y almacenamiento
+    del modelo CNN basado en ResNet-18.
+
+    El procedimiento comprende las siguientes etapas:
+
+    1. Carga del conjunto de entrenamiento y prueba.
+    2. Balanceo del conjunto de entrenamiento mediante muestreo ponderado.
+    3. Construcción de una arquitectura ResNet-18 preentrenada.
+    4. Entrenamiento de la red neuronal.
+    5. Selección automática del modelo con mayor precisión.
+    6. Evaluación sobre el conjunto de prueba.
+    7. Generación del reporte de clasificación.
+    8. Construcción de la matriz de confusión.
+    9. Generación de la curva ROC multiclase.
+    10. Exportación de métricas en formato JSON.
+    11. Almacenamiento de los pesos del mejor modelo entrenado.
+
+    Returns:
+        None
+
+    Notes:
+        El entrenamiento utiliza:
+
+        - Data Augmentation en tiempo real.
+        - Muestreo ponderado (WeightedRandomSampler).
+        - Función de pérdida CrossEntropyLoss con pesos por clase.
+        - Optimizador AdamW.
+        - Transfer Learning utilizando ResNet-18 preentrenada en ImageNet.
+        - Selección automática del mejor modelo según el accuracy obtenido sobre el conjunto de prueba.
+    """
     print(f"🚀 Iniciando entrenamiento CNN (Reproducible) en: {DEVICE}")
     
     train_dataset = datasets.ImageFolder(TRAIN_DIR, transform=train_transforms)
@@ -120,6 +178,22 @@ def entrenar_cnn():
     class_weights_tensor = torch.tensor(class_weights, dtype=torch.float).to(DEVICE)
 
     def seed_worker(worker_id):
+        """
+        Inicializa la semilla aleatoria de cada proceso trabajador (worker)
+        utilizado por el DataLoader para garantizar la reproducibilidad del
+        entrenamiento.
+
+        Args:
+            worker_id (int):
+                Identificador del worker creado por PyTorch.
+
+        Returns:
+            None
+
+        Notes:
+            La función establece la misma semilla para NumPy y el módulo
+            random a partir de la semilla generada por PyTorch.
+        """
         worker_seed = torch.initial_seed() % 2**32
         np.random.seed(worker_seed)
         random.seed(worker_seed)

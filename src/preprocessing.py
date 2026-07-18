@@ -138,8 +138,17 @@ def procesar_y_guardar_conjunto(rutas_imagenes, etiquetas, ruta_salida_base, sub
         img_rgb_224 = procesar_una_imagen(img_cruda, tamaño_objetivo)
 
         if img_rgb_224 is not None:
-            # Paso 2 y 3: Mejorar iluminación con CLAHE
-            img_final_rgb, _ = aplicar_clahe_canal_l(img_rgb_224)
+            
+            # Paso 2: Filtro Bilateral para reducir ruido conservando bordes
+            img_filtrada = cv2.bilateralFilter(
+                img_rgb_224,
+                d=9,            # Diámetro del vecindario de píxeles
+                sigmaColor=75,  # Filtro sigma en el espacio de color
+                sigmaSpace=75   # Filtro sigma en el espacio de coordenadas
+            )
+
+            # Paso 3: Mejorar iluminación con CLAHE (aplicado a la imagen filtrada)
+            img_final_rgb, _ = aplicar_clahe_canal_l(img_filtrada)
             
             # Paso 4: Exportar a disco (Convertir a BGR para OpenCV)
             img_bgr_export = cv2.cvtColor(img_final_rgb, cv2.COLOR_RGB2BGR)

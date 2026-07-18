@@ -20,6 +20,33 @@ os.makedirs(MODELOS_DIR, exist_ok=True)
 MODELOS = ["siglip", "clip", "dinov2"]
 
 def cargar_datos(modelo_nombre: str):
+    """
+    Carga los vectores de características correspondientes a un modelo
+    fundacional para los conjuntos de entrenamiento y prueba.
+
+    Los datos son leídos desde archivos CSV previamente generados durante
+    la etapa de extracción de características y se separan en matrices de
+    características y etiquetas.
+
+    Args:
+        modelo_nombre (str):
+            Nombre del modelo fundacional cuyos embeddings se desean
+            cargar (por ejemplo: ``"clip"``, ``"siglip"`` o
+            ``"dinov2"``).
+
+    Returns:
+        tuple:
+            Tupla con los siguientes elementos:
+
+            - X_train (numpy.ndarray): Características del conjunto de entrenamiento.
+            - y_train (numpy.ndarray): Etiquetas del conjunto de entrenamiento.
+            - X_test (numpy.ndarray): Características del conjunto de prueba.
+            - y_test (numpy.ndarray): Etiquetas del conjunto de prueba.
+
+            Si los archivos no existen, retorna:
+
+            ``(None, None, None, None)``.
+    """
     ruta_train = FEATURES_DIR / f"{modelo_nombre}_train.csv"
     ruta_test = FEATURES_DIR / f"{modelo_nombre}_test.csv"
     if not ruta_train.exists() or not ruta_test.exists(): 
@@ -36,6 +63,47 @@ def cargar_datos(modelo_nombre: str):
     return X_train, y_train, X_test, y_test
 
 def evaluar_modelo(modelo_nombre: str, k_neighbors: int = 5):
+    """
+    Entrena y evalúa un clasificador K-Nearest Neighbors utilizando los
+    embeddings generados por un modelo fundacional.
+
+    El procedimiento incluye la carga de los datos, la construcción de un
+    Pipeline con normalización L2 y un clasificador K-NN basado en la
+    distancia del coseno, validación cruzada mediante Stratified K-Fold,
+    entrenamiento final y evaluación sobre el conjunto de prueba.
+
+    Args:
+        modelo_nombre (str):
+            Nombre del modelo fundacional cuyos embeddings serán
+            utilizados.
+
+        k_neighbors (int, optional):
+            Número de vecinos considerados por el algoritmo K-NN.
+            El valor predeterminado es 5.
+
+    Returns:
+        tuple:
+            Tupla formada por:
+
+            - sklearn.pipeline.Pipeline:
+              Pipeline entrenado compuesto por el normalizador y el
+              clasificador K-NN.
+
+            - float:
+              Accuracy obtenido sobre el conjunto de prueba.
+
+            Si los datos no existen, retorna:
+
+            ``(None, None)``.
+
+    Notes:
+        El modelo utiliza:
+
+        - Normalización L2.
+        - Distancia del coseno.
+        - Ponderación por distancia.
+        - Validación cruzada estratificada de cinco particiones.
+    """
     print(f"\n{'='*60}\n🚀 EVALUANDO: {modelo_nombre.upper()} + K-NN Puro (Coseno)\n{'='*60}")
     
     X_train, y_train, X_test, y_test = cargar_datos(modelo_nombre)

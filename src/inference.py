@@ -41,6 +41,22 @@ RUTAS_HF = {
 # 2. CARGA DE MODELOS EN MEMORIA
 # ==============================================================================
 def cargar_cnn():
+    """
+    Carga el modelo CNN ResNet-18 previamente entrenado para la
+    clasificación de etnias.
+
+    El modelo reconstruye la arquitectura ResNet-18, carga los pesos
+    almacenados en disco y lo configura en modo de evaluación para
+    realizar inferencias.
+
+    Returns:
+        torch.nn.Module:
+            Modelo ResNet-18 listo para realizar predicciones.
+
+    Raises:
+        FileNotFoundError:
+            Si no se encuentra el archivo de pesos (.pth) del modelo.
+    """
     ruta_pesos = MODELOS_DIR / "resnet18_fenotipos_best.pth"
     if not ruta_pesos.exists(): raise FileNotFoundError("No se encontró el .pth")
     model = models.resnet18(weights=None)
@@ -52,6 +68,22 @@ def cargar_cnn():
     return model
 
 def cargar_extractor_hf(nombre_modelo):
+    """
+    Carga un modelo fundacional de visión y su procesador asociado desde
+    Hugging Face.
+
+    Args:
+        nombre_modelo (str):
+            Nombre del modelo a cargar. Debe existir como clave dentro
+            del diccionario ``RUTAS_HF``.
+
+    Returns:
+        tuple:
+            Tupla formada por:
+
+            - AutoImageProcessor: Procesador del modelo.
+            - AutoModel: Modelo de visión cargado en memoria y preparado para inferencia.
+    """
     repo = RUTAS_HF[nombre_modelo]
     processor = AutoImageProcessor.from_pretrained(repo)
     model = AutoModel.from_pretrained(repo).to(DEVICE)
@@ -59,6 +91,23 @@ def cargar_extractor_hf(nombre_modelo):
     return processor, model
 
 def cargar_knn(nombre_modelo):
+    """
+    Carga un clasificador KNN previamente entrenado desde un archivo
+    serializado.
+
+    Args:
+        nombre_modelo (str):
+            Nombre del modelo fundacional utilizado para entrenar el
+            clasificador KNN.
+
+    Returns:
+        sklearn.pipeline.Pipeline:
+            Pipeline entrenado que contiene el modelo KNN.
+
+    Raises:
+        FileNotFoundError:
+            Si no existe el archivo del modelo solicitado.
+    """
     ruta_pkl = MODELOS_DIR / f"knn_{nombre_modelo}_best.pkl"
     if not ruta_pkl.exists(): raise FileNotFoundError(f"No pipeline: {ruta_pkl.name}")
     return joblib.load(ruta_pkl)
@@ -67,25 +116,75 @@ def cargar_knn(nombre_modelo):
 # 3. PREPROCESAMIENTO Y VISUALIZACIÓN
 # ==============================================================================
 def preprocesar_imagen_cnn(imagen_pil, tamaño_objetivo=(224, 224)):
-    """Replica exacta del CLAHE en LAB y Center Crop."""
-    img_np = np.array(imagen_pil)
-    alto, ancho = img_np.shape[:2]
+    """
+    Preprocesa una imagen utilizando el mismo pipeline aplicado durante
+    el entrenamiento del modelo CNN.
+
+    El procedimiento incluye recorte central, redimensionamiento,
+    filtrado bilateral y mejora del contraste mediante CLAHE en el
+    espacio de color LAB.
+
+    Args:
+        imagen_pil (PIL.Image.Image):
+            Imagen de entrada.
+
+        tamaño_objetivo (tuple[int, int], optional):
+            Resolución final de la imagen procesada.
+
+    Returns:
+        numpy.ndarray:
+            Imagen preprocesada en formato RGB lista para convertirse en
+            tensor e ingresar a la red neuronal.
+    """
+    # 1. Convertir PIL (RGB) a numpy array
+    img_rgb = np.array(imagen_pil)
+    
+    # 2. Recorte Central y Resize (evita distorsión geométrica)
+    alto, ancho = img_rgb.shape[:2]
     lado = min(alto, ancho)
     inicio_y = (alto // 2) - (lado // 2)
     inicio_x = (ancho // 2) - (lado // 2)
-    img_cuadrada = img_np[inicio_y:inicio_y+lado, inicio_x:inicio_x+lado]
-    
+    img_cuadrada = img_rgb[inicio_y:inicio_y+lado, inicio_x:inicio_x+lado]
     img_redimensionada = cv2.resize(img_cuadrada, tamaño_objetivo)
-    img_lab = cv2.cvtColor(img_redimensionada, cv2.COLOR_RGB2LAB)
+    
+    # 3. Filtro Bilateral para reducir ruido conservando bordes faciales
+    img_filtrada = cv2.bilateralFilter(
+        img_redimensionada,
+        d=9,
+        sigmaColor=75,
+        sigmaSpace=75
+    )
+    
+    # 4. Mejora de iluminación con CLAHE en el espacio LAB
+    img_lab = cv2.cvtColor(img_filtrada, cv2.COLOR_RGB2LAB)
     l, a, b = cv2.split(img_lab)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     l_clahe = clahe.apply(l)
     img_lab_clahe = cv2.merge((l_clahe, a, b))
     
-    return cv2.cvtColor(img_lab_clahe, cv2.COLOR_LAB2RGB)
+    # 5. Retornar al formato RGB esperado por el modelo
+    img_final_rgb = cv2.cvtColor(img_lab_clahe, cv2.COLOR_LAB2RGB)
+    
+    return img_final_rgb
 
 def preprocesar_imagen_transformer(imagen_pil, processor):
-    """Convierte los tensores estadísticos del Transformer en una imagen visible."""
+    """
+    Convierte una imagen en el formato requerido por un modelo
+    Transformer y genera una representación visual del tensor
+    preprocesado.
+
+    Args:
+        imagen_pil (PIL.Image.Image):
+            Imagen de entrada.
+
+        processor (AutoImageProcessor):
+            Procesador asociado al modelo Transformer.
+
+    Returns:
+        numpy.ndarray:
+            Imagen en formato RGB de tipo uint8 adecuada para su
+            visualización.
+    """
     inputs = processor(images=imagen_pil, return_tensors="pt")
     tensor = inputs['pixel_values'][0].numpy()
     
@@ -101,6 +200,28 @@ def preprocesar_imagen_transformer(imagen_pil, processor):
 # 4. MOTORES DE PREDICCIÓN
 # ==============================================================================
 def predecir_etnia_cnn(imagen_pil, modelo_cnn):
+    """
+    Realiza la predicción de la etnia utilizando el modelo CNN
+    previamente entrenado.
+
+    La imagen es preprocesada, convertida a tensor y evaluada por la red
+    neuronal para obtener las probabilidades de pertenencia a cada clase.
+
+    Args:
+        imagen_pil (PIL.Image.Image):
+            Imagen sobre la que se realizará la inferencia.
+
+        modelo_cnn (torch.nn.Module):
+            Modelo CNN cargado en memoria.
+
+    Returns:
+        dict:
+            Diccionario con la etnia predicha, el porcentaje de confianza
+            y el desglose de probabilidades para todas las clases.
+
+            Si ocurre un error durante la inferencia, se devuelve un
+            diccionario con la clave ``error``.
+    """
     try:
         img_preprocesada = preprocesar_imagen_cnn(imagen_pil)
         img_tensor = transformacion_tensor(img_preprocesada).unsqueeze(0).to(DEVICE)
@@ -118,6 +239,42 @@ def predecir_etnia_cnn(imagen_pil, modelo_cnn):
         return {"error": str(e)}
 
 def predecir_etnia_knn(imagen_pil, pipeline_knn, processor, model_hf, nombre_modelo):
+    """
+    Realiza la predicción de la etnia utilizando un clasificador KNN
+    alimentado con embeddings obtenidos mediante un modelo fundacional
+    de visión.
+
+    La función extrae las características de la imagen mediante CLIP,
+    DINOv2 o SigLIP y posteriormente utiliza un modelo KNN para
+    estimar la clase más probable.
+
+    Args:
+        imagen_pil (PIL.Image.Image):
+            Imagen de entrada.
+
+        pipeline_knn (sklearn.pipeline.Pipeline):
+            Pipeline entrenado que contiene el clasificador KNN.
+
+        processor (AutoImageProcessor):
+            Procesador correspondiente al modelo fundacional.
+
+        model_hf (AutoModel):
+            Modelo Transformer utilizado para la extracción de
+            características.
+
+        nombre_modelo (str):
+            Nombre del modelo fundacional utilizado
+            ("clip", "siglip" o "dinov2").
+
+    Returns:
+        dict:
+            Diccionario con la etnia predicha, el porcentaje de confianza
+            y el desglose de probabilidades para cada clase.
+
+            Si ocurre un error durante el proceso de extracción o
+            clasificación, se devuelve un diccionario con la clave
+            ``error``.
+    """
     try:
         # 1. Procesar la imagen
         inputs = processor(images=imagen_pil, return_tensors="pt").to(DEVICE)
