@@ -23,6 +23,7 @@ metrics/*
 !metrics/*.json
 !metrics/*.csv
 !metrics/*.txt
+!metrics/*.png
 
 # Archivos temporales de Python
 __pycache__/
