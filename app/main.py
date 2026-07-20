@@ -52,7 +52,7 @@ with st.sidebar:
     st.divider()
     opcion = st.radio("Menú de Navegación:", [
         "📊 Análisis del Dataset (EDA)", 
-        "🛠️ Análisis del Pipeline",   # <-- NUEVA OPCIÓN AGREGADA
+        "🛠️ Análisis del Pipeline",  
         "📈 Métricas de Modelos", 
         "🧠 Clasificador en Vivo"
     ])
@@ -136,17 +136,17 @@ if opcion == "📊 Análisis del Dataset (EDA)":
     st.divider()
 
 # ==============================================================================
-# 4. VISTA NUEVA: ANÁLISIS DEL PIPELINE Y EXTRACCIÓN (NUEVO)
+# 4. VISTA NUEVA: ANÁLISIS DEL PIPELINE Y EXTRACCIÓN
 # ==============================================================================
 elif opcion == "🛠️ Análisis del Pipeline":
     st.title("Análisis de Preprocesamiento y Extracción de Características")
     
     # --- SECCIÓN 1: PIPELINE VISUAL ---
     st.header("1. Pipeline de Preprocesamiento Visual")
-    st.write("A continuación se muestra cómo el sistema estandariza geométrica y lumínicamente una imagen original antes de inyectarla a la red neuronal.")
+    st.write("Se muestra el proceso mediante el cual el sistema estandariza y mejora la iluminación de la imagen original antes de ingresarla a los modelos.")
     
     # Definir la ruta de la imagen fija de ejemplo
-    ruta_img_ejemplo = METRICS_DIR / "004_76.jpg"
+    ruta_img_ejemplo = METRICS_DIR / "004_76.JPG"
     
     if ruta_img_ejemplo.exists():
         try:
@@ -159,8 +159,8 @@ elif opcion == "🛠️ Análisis del Pipeline":
                 st.image(img_original, use_container_width=True)
                 
             with col2:
-                st.subheader("2. Center Crop (224x224)")
-                # Simulamos visualmente el Center Crop
+                st.subheader("2. Center Crop")
+                # Simulamos visualmente solo el Center Crop para ilustrar el paso intermedio
                 width, height = img_original.size
                 min_dim = min(width, height)
                 left = (width - min_dim)/2
@@ -169,29 +169,17 @@ elif opcion == "🛠️ Análisis del Pipeline":
                 bottom = (height + min_dim)/2
                 img_crop = img_original.crop((left, top, right, bottom)).resize((224, 224))
                 st.image(img_crop, use_container_width=True)
-                st.caption("Alineación geométrica central y redimensionamiento sin distorsión.")
+                st.caption("Alineación geométrica central y redimensionamiento (224x224) sin distorsión.")
                 
             with col3:
-                st.subheader("3. Ecualización CLAHE")
+                st.subheader("3. Bilateral + CLAHE")
                 
-                # 1. Tomar el recorte (img_crop) y pasarlo a formato numpy
-                img_np = np.array(img_crop)
+                # LLAMADA DIRECTA A LA FUNCIÓN DE INFERENCIA
+                img_procesada_pipeline = preprocesar_imagen_cnn(img_original)
                 
-                # 2. Convertir de RGB a LAB
-                img_lab = cv2.cvtColor(img_np, cv2.COLOR_RGB2LAB)
-                l, a, b = cv2.split(img_lab)
-                
-                # 3. Aplicar CLAHE solo al canal L con un límite SUAVE (1.5) para evitar efecto plástico
-                clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
-                l_clahe = clahe.apply(l)
-                
-                # 4. Volver a unir los canales y regresar a RGB
-                img_lab_clahe = cv2.merge((l_clahe, a, b))
-                img_clahe_rgb = cv2.cvtColor(img_lab_clahe, cv2.COLOR_LAB2RGB)
-                
-                # 5. Mostrar en Streamlit
-                st.image(img_clahe_rgb, use_container_width=True)
-                st.caption("Ecualización adaptativa (CLAHE) aplicada sobre el canal L (espacio LAB).")
+                # Mostrar en Streamlit
+                st.image(img_procesada_pipeline, use_container_width=True)
+                st.caption("Suavizado de texturas y ecualización adaptativa (CLAHE) en el canal L.")
                 
         except Exception as e:
             st.error(f"Error procesando la imagen de demostración: {e}")
@@ -222,13 +210,9 @@ elif opcion == "🛠️ Análisis del Pipeline":
         hide_index=True
     )
     
-    st.info("""
-    **⚙️ Optimización de Hardware:** Durante la fase *offline*, la extracción de características se optimizó encapsulando el pase hacia adelante (`forward pass`) dentro de la directiva `torch.no_grad()` de PyTorch. 
-    Al deshabilitar el cálculo de gradientes, el sistema redujo el consumo de memoria gráfica en más del 50%, acelerando drásticamente el tiempo de procesamiento masivo.
-    """)
 
 # ==============================================================================
-# 5. VISTA 2: MÉTRICAS DE MODELOS (CONSUMO DE JSONs QUEMADOS)
+# 5. VISTA 3: MÉTRICAS DE MODELOS (CONSUMO DE JSONs QUEMADOS)
 # ==============================================================================
 elif opcion == "📈 Métricas de Modelos":
     st.title("Desempeño de Modelos Entrenados")
@@ -316,7 +300,7 @@ elif opcion == "📈 Métricas de Modelos":
                     st.warning("Imagen de Curva ROC no encontrada.")
 
 # ==============================================================================
-# 6. VISTA 3: EL CLASIFICADOR
+# 6. VISTA 4: EL CLASIFICADOR
 # ==============================================================================
 elif opcion == "🧠 Clasificador en Vivo":
     st.title("Clasificación de Etnia")
@@ -372,7 +356,7 @@ elif opcion == "🧠 Clasificador en Vivo":
             
         with col2:
             st.subheader("2. Imagen Preprocesada")
-            # 1. Aplicamos el preprocesamiento base (CLAHE + Crop) UNA SOLA VEZ
+            # 1. Aplicamos el preprocesamiento base UNA SOLA VEZ
             img_procesada_base = preprocesar_imagen_cnn(img_pil)
             # 2. Mostramos la misma imagen para todos
             st.image(img_procesada_base, use_container_width=True, caption="Preprocesamiento universal")
