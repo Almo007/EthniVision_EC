@@ -150,9 +150,9 @@ def preprocesar_imagen_cnn(imagen_pil, tamaño_objetivo=(224, 224)):
     # 3. Filtro Bilateral para reducir ruido conservando bordes faciales
     img_filtrada = cv2.bilateralFilter(
         img_redimensionada,
-        d=9,
-        sigmaColor=75,
-        sigmaSpace=75
+        d=5,
+        sigmaColor=15,
+        sigmaSpace=15
     )
     
     # 4. Mejora de iluminación con CLAHE en el espacio LAB

@@ -142,9 +142,9 @@ def procesar_y_guardar_conjunto(rutas_imagenes, etiquetas, ruta_salida_base, sub
             # Paso 2: Filtro Bilateral para reducir ruido conservando bordes
             img_filtrada = cv2.bilateralFilter(
                 img_rgb_224,
-                d=9,            # Diámetro del vecindario de píxeles
-                sigmaColor=75,  # Filtro sigma en el espacio de color
-                sigmaSpace=75   # Filtro sigma en el espacio de coordenadas
+                d=5,            # Diámetro del vecindario de píxeles
+                sigmaColor=15,  # Filtro sigma en el espacio de color
+                sigmaSpace=15   # Filtro sigma en el espacio de coordenadas
             )
 
             # Paso 3: Mejorar iluminación con CLAHE (aplicado a la imagen filtrada)

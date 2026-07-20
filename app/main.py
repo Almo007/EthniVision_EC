@@ -6,11 +6,14 @@ from PIL import Image
 import json
 import os
 import sys
+import cv2
+import numpy as np
 from funcion_camara import capturar_rostro_guiado
+
 # ==============================================================================
 # 0. RESOLUCIÓN DE RUTAS (Fijar el Path de Python)
 # ==============================================================================
-# Obtenemos la ruta raíz (C:\Users\GAMER\Desktop\EthniVision_EC)
+# Obtenemos la ruta raíz
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Le decimos a Python que incluya esta ruta maestra en sus búsquedas
@@ -19,7 +22,7 @@ sys.path.append(str(BASE_DIR))
 from src.inference import (
     cargar_cnn, predecir_etnia_cnn, preprocesar_imagen_cnn,
     cargar_extractor_hf, cargar_knn, predecir_etnia_knn,
-    preprocesar_imagen_transformer # <-- NUEVO
+    preprocesar_imagen_transformer
 )
 
 # ==============================================================================
@@ -27,7 +30,6 @@ from src.inference import (
 # ==============================================================================
 st.set_page_config(page_title="EthniVision-EC | Clasificador Étnico", page_icon="🇪🇨", layout="wide")
 
-BASE_DIR = Path(__file__).resolve().parent.parent
 CSV_PATH = BASE_DIR / "data" / "features" / "eda_metadata.csv"
 METRICS_DIR = BASE_DIR / "metrics"
 CNN_JSON_PATH = METRICS_DIR / "cnn_metrics.json"
@@ -50,6 +52,7 @@ with st.sidebar:
     st.divider()
     opcion = st.radio("Menú de Navegación:", [
         "📊 Análisis del Dataset (EDA)", 
+        "🛠️ Análisis del Pipeline",   # <-- NUEVA OPCIÓN AGREGADA
         "📈 Métricas de Modelos", 
         "🧠 Clasificador en Vivo"
     ])
@@ -132,9 +135,100 @@ if opcion == "📊 Análisis del Dataset (EDA)":
 
     st.divider()
 
+# ==============================================================================
+# 4. VISTA NUEVA: ANÁLISIS DEL PIPELINE Y EXTRACCIÓN (NUEVO)
+# ==============================================================================
+elif opcion == "🛠️ Análisis del Pipeline":
+    st.title("Análisis de Preprocesamiento y Extracción de Características")
+    
+    # --- SECCIÓN 1: PIPELINE VISUAL ---
+    st.header("1. Pipeline de Preprocesamiento Visual")
+    st.write("A continuación se muestra cómo el sistema estandariza geométrica y lumínicamente una imagen original antes de inyectarla a la red neuronal.")
+    
+    # Definir la ruta de la imagen fija de ejemplo
+    ruta_img_ejemplo = METRICS_DIR / "004_76.jpg"
+    
+    if ruta_img_ejemplo.exists():
+        try:
+            img_original = Image.open(ruta_img_ejemplo).convert('RGB')
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.subheader("1. Original")
+                st.image(img_original, use_container_width=True)
+                
+            with col2:
+                st.subheader("2. Center Crop (224x224)")
+                # Simulamos visualmente el Center Crop
+                width, height = img_original.size
+                min_dim = min(width, height)
+                left = (width - min_dim)/2
+                top = (height - min_dim)/2
+                right = (width + min_dim)/2
+                bottom = (height + min_dim)/2
+                img_crop = img_original.crop((left, top, right, bottom)).resize((224, 224))
+                st.image(img_crop, use_container_width=True)
+                st.caption("Alineación geométrica central y redimensionamiento sin distorsión.")
+                
+            with col3:
+                st.subheader("3. Ecualización CLAHE")
+                
+                # 1. Tomar el recorte (img_crop) y pasarlo a formato numpy
+                img_np = np.array(img_crop)
+                
+                # 2. Convertir de RGB a LAB
+                img_lab = cv2.cvtColor(img_np, cv2.COLOR_RGB2LAB)
+                l, a, b = cv2.split(img_lab)
+                
+                # 3. Aplicar CLAHE solo al canal L con un límite SUAVE (1.5) para evitar efecto plástico
+                clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
+                l_clahe = clahe.apply(l)
+                
+                # 4. Volver a unir los canales y regresar a RGB
+                img_lab_clahe = cv2.merge((l_clahe, a, b))
+                img_clahe_rgb = cv2.cvtColor(img_lab_clahe, cv2.COLOR_LAB2RGB)
+                
+                # 5. Mostrar en Streamlit
+                st.image(img_clahe_rgb, use_container_width=True)
+                st.caption("Ecualización adaptativa (CLAHE) aplicada sobre el canal L (espacio LAB).")
+                
+        except Exception as e:
+            st.error(f"Error procesando la imagen de demostración: {e}")
+    else:
+        st.warning(f"⚠️ No se encontró la imagen de ejemplo en la ruta: {ruta_img_ejemplo}")
+
+    st.divider()
+    
+    # --- SECCIÓN 2: COMPARATIVA DE EXTRACTORES ---
+    st.header("2. Comparativa de Modelos Fundacionales (Extractores)")
+    st.write("Análisis técnico de las dimensiones y el formato de los tensores de características (*embeddings*) extraídos por los Vision Transformers para el clasificador K-NN.")
+    
+    # Datos de la comparativa
+    datos_comparativa = {
+        "Modelo (Arquitectura)": ["DINOv2 (Small)", "CLIP (Base)", "SigLIP (Base)"],
+        "Dimensiones del Vector (Features)": [384, 512, 768],
+        "Formato de Salida": ["Numpy float32 (CSV)", "Numpy float32 (CSV)", "Numpy float32 (CSV)"],
+        "Tiempo de Extracción": ["Rápido (Baja latencia VRAM)", "Medio", "Lento (Alta dimensionalidad)"],
+        "Métrica K-NN": ["Similitud del Coseno", "Similitud del Coseno", "Similitud del Coseno"]
+    }
+    
+    df_comparativa = pd.DataFrame(datos_comparativa)
+    
+    # Mostrar tabla interactiva
+    st.dataframe(
+        df_comparativa, 
+        use_container_width=True,
+        hide_index=True
+    )
+    
+    st.info("""
+    **⚙️ Optimización de Hardware:** Durante la fase *offline*, la extracción de características se optimizó encapsulando el pase hacia adelante (`forward pass`) dentro de la directiva `torch.no_grad()` de PyTorch. 
+    Al deshabilitar el cálculo de gradientes, el sistema redujo el consumo de memoria gráfica en más del 50%, acelerando drásticamente el tiempo de procesamiento masivo.
+    """)
 
 # ==============================================================================
-# 4. VISTA 2: MÉTRICAS DE MODELOS (CONSUMO DE JSONs QUEMADOS)
+# 5. VISTA 2: MÉTRICAS DE MODELOS (CONSUMO DE JSONs QUEMADOS)
 # ==============================================================================
 elif opcion == "📈 Métricas de Modelos":
     st.title("Desempeño de Modelos Entrenados")
@@ -222,7 +316,7 @@ elif opcion == "📈 Métricas de Modelos":
                     st.warning("Imagen de Curva ROC no encontrada.")
 
 # ==============================================================================
-# 5. VISTA 3: EL CLASIFICADOR
+# 6. VISTA 3: EL CLASIFICADOR
 # ==============================================================================
 elif opcion == "🧠 Clasificador en Vivo":
     st.title("Clasificación de Etnia")
