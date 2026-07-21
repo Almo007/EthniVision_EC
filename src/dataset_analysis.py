@@ -6,53 +6,25 @@ from pathlib import Path
 import random
 import json
 
-def analyze_dataset(data_dir, output_dir, metrics_dir):
+def analyze_dataset(data_dir, output_dir, metrics_dir, blur_percentile=5):
     """
     Analiza un conjunto de imágenes organizadas por carpetas de clases,
     extrae metadatos de cada imagen y genera archivos con información
     estadística para su posterior análisis.
 
-    El proceso recorre todas las clases del dataset, calcula métricas
-    individuales para cada imagen, genera un archivo CSV con los
-    metadatos y crea un archivo JSON con estadísticas globales que
-    pueden ser utilizadas por un Dashboard.
+    Se incorpora un análisis adaptativo de borrosidad, calculando un umbral
+    basado en percentiles para identificar automáticamente imágenes desenfocadas
+    según la distribución real del dataset.
 
     Args:
-        data_dir (str | pathlib.Path):
-            Ruta del directorio que contiene las imágenes organizadas
-            por carpetas, donde cada carpeta representa una clase.
-
-        output_dir (str | pathlib.Path):
-            Directorio donde se almacenará el archivo CSV con los
-            metadatos extraídos del conjunto de imágenes.
-
-        metrics_dir (str | pathlib.Path):
-            Directorio donde se almacenará el archivo JSON con las
-            métricas globales del dataset.
+        data_dir (str | pathlib.Path): Ruta del directorio con imágenes.
+        output_dir (str | pathlib.Path): Directorio para el CSV.
+        metrics_dir (str | pathlib.Path): Directorio para el JSON.
+        blur_percentile (int/float): Percentil (0-100) usado como umbral adaptativo
+                                     para marcar imágenes como borrosas.
 
     Returns:
         None
-
-    Notes:
-        Durante la ejecución se calculan las siguientes métricas para
-        cada imagen:
-
-        - Resolución.
-        - Formato del archivo.
-        - Tamaño en megabytes.
-        - Tipo de color (RGB o escala de grises).
-        - Nivel de desenfoque mediante el operador Laplaciano.
-        - Nivel de brillo promedio.
-        - Orientación (Horizontal, Vertical o Cuadrada).
-
-        Además, se generan estadísticas globales como:
-
-        - Total de imágenes.
-        - Distribución por clases.
-        - Distribución por formatos.
-        - Distribución por orientaciones.
-        - Promedios de brillo, desenfoque y tamaño.
-        - Una imagen representativa por cada clase.
     """
     data_path = Path(data_dir).resolve()
     out_path = Path(output_dir).resolve()
@@ -66,9 +38,8 @@ def analyze_dataset(data_dir, output_dir, metrics_dir):
         return
 
     valid_extensions = {'.jpg', '.jpeg', '.png', '.bmp'}
-    
     metadata = []
-    sample_images = {} # Diccionario para asociar Clase -> Ruta de la imagen
+    sample_images = {} 
 
     print(f"Iniciando extracción de metadatos en: {data_path}\n")
 
@@ -82,15 +53,12 @@ def analyze_dataset(data_dir, output_dir, metrics_dir):
         image_files = [f for f in class_dir.rglob('*') if f.is_file() and f.suffix.lower() in valid_extensions]
         
         if image_files:
-            # Guardar 1 imagen de muestra por clase (ruta relativa para Streamlit)
             img_muestra = random.choice(image_files)
-            # Guardamos la ruta relativa desde la carpeta base del proyecto
             ruta_relativa = img_muestra.relative_to(data_path.parent.parent)
             sample_images[class_name] = str(ruta_relativa).replace("\\", "/") 
         
         for file_path in image_files:
             img = cv2.imread(str(file_path))
-            
             if img is None:
                 continue
             
@@ -129,8 +97,14 @@ def analyze_dataset(data_dir, output_dir, metrics_dir):
         print("No se encontraron imágenes válidas.")
         return
 
-    # 1. Guardar CSV (Datos crudos)
+    # 1. Guardar CSV y calcular umbral adaptativo
     df = pd.DataFrame(metadata)
+    
+    # --- CÁLCULO DE UMBRAL ADAPTATIVO POR PERCENTIL ---
+    umbral_borrosidad = np.percentile(df['blur'], blur_percentile)
+    df['is_blurry'] = df['blur'] < umbral_borrosidad
+    total_borrosas = int(df['is_blurry'].sum())
+    
     csv_path = out_path / 'eda_metadata.csv'
     df.to_csv(csv_path, index=False)
     
@@ -145,6 +119,11 @@ def analyze_dataset(data_dir, output_dir, metrics_dir):
             "desenfoque_laplaciano": round(df['blur'].mean(), 2),
             "peso_mb": round(df['size_mb'].mean(), 2)
         },
+        "analisis_borrosidad": {
+            "percentil_evaluado": blur_percentile,
+            "umbral_calculado": round(float(umbral_borrosidad), 2),
+            "total_imagenes_borrosas": total_borrosas
+        },
         "imagenes_muestra": sample_images
     }
     
@@ -154,6 +133,8 @@ def analyze_dataset(data_dir, output_dir, metrics_dir):
     
     print("\n" + "="*60)
     print(f"✅ Extracción completada.")
+    print(f"⚙️ Umbral de borrosidad ({blur_percentile} pct): {umbral_borrosidad:.2f}")
+    print(f"⚠️ Imágenes marcadas como borrosas: {total_borrosas}")
     print(f"📊 CSV exportado en: {csv_path.name} ({len(df)} registros)")
     print(f"🔥 Métricas JSON quemadas en: {json_path.name}")
     print("==================================================")
@@ -162,6 +143,7 @@ if __name__ == "__main__":
     base_dir = Path(__file__).resolve().parent.parent
     target_directory = base_dir / "data" / "raw"
     features_directory = base_dir / "data" / "features"
-    metrics_directory = base_dir / "metrics"  # <-- Nueva carpeta central de métricas
+    metrics_directory = base_dir / "metrics"
     
-    analyze_dataset(target_directory, features_directory, metrics_directory)
+    # Se pasa el percentil deseado (ej. 5%)
+    analyze_dataset(target_directory, features_directory, metrics_directory, blur_percentile=5)

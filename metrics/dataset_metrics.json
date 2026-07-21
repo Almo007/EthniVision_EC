@@ -17,10 +17,15 @@
         "desenfoque_laplaciano": 5.34,
         "peso_mb": 0.8
     },
+    "analisis_borrosidad": {
+        "percentil_evaluado": 5,
+        "umbral_calculado": 3.26,
+        "total_imagenes_borrosas": 22
+    },
     "imagenes_muestra": {
-        "Afro-ecuadorians": "data/raw/Afro-ecuadorians/003_4.JPG",
-        "European descendants": "data/raw/European descendants/002_38.JPG",
-        "Indigenous": "data/raw/Indigenous/001_45.JPG",
-        "Mestizos": "data/raw/Mestizos/004_200.JPG"
+        "Afro-ecuadorians": "data/raw/Afro-ecuadorians/003_28.JPG",
+        "European descendants": "data/raw/European descendants/002_34.JPG",
+        "Indigenous": "data/raw/Indigenous/001_2.JPG",
+        "Mestizos": "data/raw/Mestizos/004_174.JPG"
     }
 }

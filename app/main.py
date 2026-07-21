@@ -32,6 +32,7 @@ st.set_page_config(page_title="EthniVision-EC | Clasificador Étnico", page_icon
 
 CSV_PATH = BASE_DIR / "data" / "features" / "eda_metadata.csv"
 METRICS_DIR = BASE_DIR / "metrics"
+DATASET_JSON_PATH = METRICS_DIR / "dataset_metrics.json" # <-- NUEVA RUTA
 CNN_JSON_PATH = METRICS_DIR / "cnn_metrics.json"
 KNN_JSON_PATH = METRICS_DIR / "master_metrics.json"
 
@@ -74,6 +75,22 @@ if opcion == "📊 Análisis del Dataset (EDA)":
         st.error("No se encontró el archivo de metadatos. Ejecuta el preprocesamiento primero.")
         st.stop()
 
+    # --- LECTURA DE MÉTRICAS GLOBALES (UMBRAL ADAPTATIVO) ---
+    umbral_borroso = 100 # Valor por defecto fallback
+    total_borrosas = 0
+    percentil_usado = 5
+    if DATASET_JSON_PATH.exists():
+        try:
+            with open(DATASET_JSON_PATH, 'r', encoding='utf-8') as f:
+                dataset_metrics = json.load(f)
+                info_borrosidad = dataset_metrics.get("analisis_borrosidad", {})
+                if info_borrosidad:
+                    umbral_borroso = info_borrosidad.get("umbral_calculado", 100)
+                    total_borrosas = info_borrosidad.get("total_imagenes_borrosas", 0)
+                    percentil_usado = info_borrosidad.get("percentil_evaluado", 5)
+        except Exception as e:
+            st.warning(f"No se pudo leer el JSON de métricas adaptativas: {e}")
+
     # --- SECCIÓN 1: RESUMEN (TARJETAS/KPIs) ---
     st.header("1. Resumen General")
     
@@ -100,7 +117,8 @@ if opcion == "📊 Análisis del Dataset (EDA)":
     c5.metric("Resolución Máxima", f"{max_res}", f"{count_max_res} imágenes")
     c6.metric("Resolución Mínima", f"{min_res}", f"{count_min_res} imágenes")
     c7.metric("Tamaño Promedio", f"{avg_size:.2f} MB")
-    c8.metric("Formatos Encontrados", formatos, tipos_color)
+    # Nueva métrica adaptativa integrada
+    c8.metric(f"Imágenes Borrosas (P{percentil_usado})", total_borrosas, f"Umbral: < {umbral_borroso:.1f}", delta_color="inverse")
 
     st.divider()
 
@@ -127,7 +145,8 @@ if opcion == "📊 Análisis del Dataset (EDA)":
         st.plotly_chart(fig_res, use_container_width=True)
 
         fig_blur = px.histogram(df, x='blur', nbins=30, title="📈 Distribución del Enfoque (Varianza)", color_discrete_sequence=['#8b5cf6'])
-        fig_blur.add_vline(x=100, line_dash="dash", line_color="red", annotation_text="Umbral Borroso")
+        # APLICACIÓN DEL UMBRAL ADAPTATIVO
+        fig_blur.add_vline(x=umbral_borroso, line_dash="dash", line_color="red", annotation_text=f"Umbral Adaptativo: {umbral_borroso:.1f}")
         st.plotly_chart(fig_blur, use_container_width=True)
         
         fig_box = px.box(df, x='class', y='width', color='class', title="📦 Variabilidad de Dimensiones (Ancho)")
