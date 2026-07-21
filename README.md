@@ -371,3 +371,8 @@ streamlit run app/main.py
 ```bash
 https://figshare.com/articles/dataset/Dataset_of_Ethnic_facial_images_of_Ecuadorian_people/8266730
 ```
+---
+
+```bash
+Avilés, Jorge; Toapanta, Henry; Morillo, Paulina; Vallejo-Huanga, Diego (2019). Dataset of Ethnic Facial Images of Ecuadorian People. figshare. Dataset. https://doi.org/10.6084/m9.figshare.8266730.v3
+```
